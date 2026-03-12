@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Timers</title>
+
+  <link rel="manifest" href="data:application/manifest+json,{
+    %22name%22:%22Timers%22,
+    %22short_name%22:%22Timers%22,
+    %22start_url%22:%22.%22,
+    %22display%22:%22standalone%22,
+    %22background_color%22:%22%23111110%22,
+    %22theme_color%22:%22%23111110%22,
+    %22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23111110'/%3E%3Ccircle cx='50' cy='54' r='26' stroke='%23e8b84b' stroke-width='6' fill='none'/%3E%3Cline x1='50' y1='54' x2='50' y2='36' stroke='%23e8b84b' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='50' y1='54' x2='62' y2='54' stroke='%23e8b84b' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='42' y1='22' x2='58' y2='22' stroke='%23e8b84b' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='50' y1='22' x2='50' y2='28' stroke='%23e8b84b' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E%22,%22sizes%22:%22any%22,%22type%22:%22image/svg+xml%22}]
+  }" />
+
+  <meta name="theme-color" content="#111110" id="theme-meta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Timers" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── TOKENS ─────────────────────────────────────────────── */
+    :root {
+      --bg:        #111110;
+      --bg2:       #1a1a18;
+      --bg3:       #242420;
+      --line:      #2e2e2a;
+      --muted:     #6b6b60;
+      --text:      #e8e8e0;
+      --text2:     #a0a090;
+      --accent:    #e8b84b;
+      --accent-bg: rgba(232,184,75,.10);
+      --danger:    #e85a4b;
+      --danger-bg: rgba(232,90,75,.10);
+      --running:   #5be88a;
+      --running-bg:rgba(91,232,138,.10);
+      --radius:    18px;
+      --radius-sm: 12px;
+      --bar-h:     64px;
+      --safe-b:    env(safe-area-inset-bottom, 0px);
+    }
+
+    .light {
+      --bg:        #f5f4f0;
+      --bg2:       #eceae3;
+      --bg3:       #e0ddd4;
+      --line:      #d0cdc4;
+      --muted:     #9c9888;
+      --text:      #1a1a16;
+      --text2:     #6b6860;
+      --accent:    #c4920a;
+      --accent-bg: rgba(196,146,10,.10);
+      --danger:    #cc3a2c;
+      --danger-bg: rgba(204,58,44,.10);
+      --running:   #1a9946;
+      --running-bg:rgba(26,153,70,.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-weight: 400;
+      overscroll-behavior: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 430px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+
+    /* ── VIEWS ──────────────────────────────────────────────── */
+    .view {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: env(safe-area-inset-top, 20px) 20px 0;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── LIST VIEW ──────────────────────────────────────────── */
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 24px 0 28px;
+    }
+
+    .list-title {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    .list-title span {
+      color: var(--accent);
+    }
+
+    .count-pill {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    /* ── ADD FORM ───────────────────────────────────────────── */
+    .add-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .add-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.18s;
+      -webkit-appearance: none;
+    }
+    .add-input::placeholder { color: var(--muted); }
+    .add-input:focus { border-color: var(--accent); }
+
+    .btn-save {
+      background: var(--accent);
+      color: #111110;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0 20px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-save:disabled { opacity: 0.3; cursor: default; }
+    .btn-save:not(:disabled):active { transform: scale(0.94); opacity: 0.85; }
+
+    /* ── TIMER LIST ─────────────────────────────────────────── */
+    .timers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 20px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 56px 0 40px;
+      color: var(--muted);
+    }
+    .empty-icon {
+      font-size: 2.4rem;
+      margin-bottom: 14px;
+      opacity: 0.5;
+    }
+    .empty-msg {
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    /* swipe-to-delete wrapper */
+    .timer-row {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+    }
+
+    .delete-bg {
+      position: absolute;
+      inset: 0;
+      background: var(--danger-bg);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 22px;
+      border-radius: var(--radius);
+      border: 1.5px solid var(--danger);
+    }
+    .delete-bg-icon {
+      font-size: 1.1rem;
+      color: var(--danger);
+    }
+
+    .timer-card {
+      position: relative;
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: pan-y;
+      transition: border-color 0.18s, transform 0.12s ease-out;
+      will-change: transform;
+    }
+
+    .timer-card.running {
+      border-color: var(--running);
+    }
+
+    .timer-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .timer-name {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .timer-elapsed {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 300;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .timer-card.running .timer-elapsed {
+      color: var(--running);
+    }
+
+    .running-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--running);
+      flex-shrink: 0;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .btn-start {
+      background: var(--accent-bg);
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius-sm);
+      width: 42px;
+      height: 42px;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-start:active { transform: scale(0.88); background: var(--accent); color: #111110; }
+
+    /* ── FOCUS VIEW ─────────────────────────────────────────── */
+    .focus-view {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+      flex: 1;
+      padding: env(safe-area-inset-top, 20px) 28px 0;
+      text-align: center;
+    }
+
+    .focus-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .focus-name {
+      font-size: 1.7rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 48px;
+      max-width: 300px;
+      line-height: 1.2;
+    }
+
+    .focus-clock {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(4rem, 18vw, 5.5rem);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 64px;
+      tab-size: 4;
+    }
+
+    .focus-clock .colon {
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    .btn-pause {
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      color: var(--text2);
+      border-radius: 100px;
+      padding: 16px 40px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .btn-pause:active { transform: scale(0.95); border-color: var(--muted); }
+
+    .pause-icon {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .pause-bar {
+      width: 4px;
+      height: 16px;
+      background: var(--text2);
+      border-radius: 2px;
+    }
+
+    /* ── APP BAR ────────────────────────────────────────────── */
+    .app-bar {
+      height: var(--bar-h);
+      padding-bottom: var(--safe-b);
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 24px;
+      padding-right: 24px;
+      flex-shrink: 0;
+    }
+
+    .bar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bar-icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    .bar-name {
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* focus-mode bar: back button */
+    .bar-back {
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 400;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 0;
+    }
+    .bar-back:active { opacity: 0.6; }
+
+    .theme-toggle {
+      background: var(--bg3);
+      border: 1.5px solid var(--line);
+      border-radius: 100px;
+      width: 52px;
+      height: 28px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.25s, border-color 0.25s;
+      flex-shrink: 0;
+    }
+
+    .toggle-knob {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), background 0.25s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+    }
+
+    .light .toggle-knob {
+      transform: translateX(24px);
+      background: var(--accent);
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────────────────── */
+    .slide-up-enter { animation: slideUp 0.28s cubic-bezier(.22,.68,0,1.2) both; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-enter { animation: fadeIn 0.22s ease both; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+/* ── Service Worker ───────────────────────────────────────── */
+if ('serviceWorker' in navigator) {
+  const sw = `
+    const CACHE='timers-v1';
+    self.addEventListener('install',e=>{
+      e.waitUntil(caches.open(CACHE).then(c=>c.addAll([self.location.href])));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate',e=>{
+      e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch',e=>{
+      e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+    });
+  `;
+  const blob = new Blob([sw], { type:'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob), { scope:'./' }).catch(()=>{});
+}
+
+/* ── App ──────────────────────────────────────────────────── */
+const { createApp, ref, computed, watch, onMounted, onUnmounted } = Vue;
+
+createApp({
+  template: `
+  <div :class="['app-root', theme]" id="app-inner">
+
+    <!-- ══ LIST VIEW ══ -->
+    <template v-if="view === 'list'">
+      <div class="view fade-enter">
+        <div class="list-header">
+          <h1 class="list-title">Tim<span>ers</span></h1>
+          <span class="count-pill">{{ timers.length }} saved</span>
+        </div>
+
+        <!-- Add form -->
+        <div class="add-form">
+          <input
+            class="add-input"
+            v-model="newName"
+            @keyup.enter="addTimer"
+            placeholder="Timer name…"
+            maxlength="32"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <button class="btn-save" @click="addTimer" :disabled="!newName.trim()">Save</button>
+        </div>
+
+        <!-- Timer list -->
+        <div class="timers-list">
+          <div v-if="timers.length === 0" class="empty-state">
+            <div class="empty-icon">⏱</div>
+            <p class="empty-msg">No timers yet.<br/>Enter a name above to get started.</p>
+          </div>
+
+          <div
+            v-for="t in timers"
+            :key="t.id"
+            class="timer-row slide-up-enter"
+          >
+            <!-- delete bg -->
+            <div class="delete-bg">
+              <span class="delete-bg-icon">Delete</span>
+            </div>
+
+            <!-- card (swipeable) -->
+            <div
+              class="timer-card"
+              :class="{ running: t.running }"
+              :data-id="t.id"
+              @touchstart="onTouchStart($event, t)"
+              @touchmove="onTouchMove($event, t)"
+              @touchend="onTouchEnd($event, t)"
+            >
+              <div v-if="t.running" class="running-dot"></div>
+
+              <div class="timer-info">
+                <div class="timer-name">{{ t.name }}</div>
+                <div class="timer-elapsed">{{ formatTime(getElapsed(t)) }}</div>
+              </div>
+
+              <button class="btn-start" @click.stop="startFocus(t)" :title="'Start ' + t.name">
+                ▶
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══ FOCUS VIEW ══ -->
+    <template v-if="view === 'focus' && focusTimer">
+      <div class="focus-view fade-enter">
+        <div class="focus-label">Running</div>
+        <div class="focus-name">{{ focusTimer.name }}</div>
+        <div class="focus-clock">
+          {{ focusHH }}<span class="colon">:</span>{{ focusMM }}<span class="colon">:</span>{{ focusSS }}
+        </div>
+        <button class="btn-pause" @click="pauseTimer">
+          <span class="pause-icon"><span class="pause-bar"></span><span class="pause-bar"></span></span>
+          Pause
+        </button>
+      </div>
+    </template>
+
+    <!-- ══ APP BAR ══ -->
+    <div class="app-bar">
+      <!-- List mode: brand -->
+      <div v-if="view === 'list'" class="bar-brand">
+        <svg class="bar-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="14" cy="15" r="9" stroke="var(--accent)" stroke-width="2"/>
+          <line x1="14" y1="15" x2="14" y2="9" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="14" y1="15" x2="19" y2="15" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="11" y1="4" x2="17" y2="4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="14" y1="4" x2="14" y2="6" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="bar-name">Timers</span>
+      </div>
+
+      <!-- Focus mode: back button -->
+      <button v-if="view === 'focus'" class="bar-back" @click="pauseTimer">
+        ← Back to list
+      </button>
+
+      <!-- Theme toggle (always) -->
+      <div class="theme-toggle" @click="toggleTheme" role="switch" :aria-checked="theme === 'light'">
+        <div class="toggle-knob">{{ theme === 'light' ? '☀️' : '🌙' }}</div>
+      </div>
+    </div>
+
+  </div>
+  `,
+
+  setup() {
+    const STORAGE_KEY = 'timers-app-v1';
+    const THEME_KEY   = 'timers-theme-v1';
+
+    /* ── State ── */
+    const view       = ref('list');
+    const newName    = ref('');
+    const timers     = ref([]);
+    const focusTimer = ref(null);
+    const theme      = ref(localStorage.getItem(THEME_KEY) || 'dark');
+    let   tickId     = null;
+    const tick       = ref(0); // forces reactivity every second
+
+    /* ── Load from storage ── */
+    function load() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Re-hydrate: running timers need their startedAt adjusted
+        timers.value = raw.map(t => ({
+          ...t,
+          // Don't auto-resume running state on reload – pause them
+          running: false,
+        }));
+      } catch { timers.value = []; }
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(timers.value));
+    }
+
+    watch(timers, save, { deep: true });
+
+    /* ── Tick every second ── */
+    function startTick() {
+      if (tickId) return;
+      tickId = setInterval(() => { tick.value++; }, 1000);
+    }
+    function stopTick() {
+      if (tickId) { clearInterval(tickId); tickId = null; }
+    }
+
+    /* ── Timer logic ── */
+    function getElapsed(t) {
+      if (!t.running) return t.accumulated || 0;
+      tick.value; // reactive dependency
+      return (t.accumulated || 0) + Math.floor((Date.now() - t.startedAt) / 1000);
+    }
+
+    function formatTime(secs) {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    function addTimer() {
+      const name = newName.value.trim();
+      if (!name) return;
+      timers.value.unshift({
+        id: Date.now(),
+        name,
+        accumulated: 0,
+        running: false,
+        startedAt: null,
+      });
+      newName.value = '';
+    }
+
+    function startFocus(t) {
+      // pause any running timer first
+      timers.value.forEach(x => {
+        if (x.running && x.id !== t.id) {
+          x.accumulated = (x.accumulated || 0) + Math.floor((Date.now() - x.startedAt) / 1000);
+          x.running = false;
+          x.startedAt = null;
+        }
+      });
+      t.running   = true;
+      t.startedAt = Date.now();
+      focusTimer.value = t;
+      view.value = 'focus';
+      startTick();
+    }
+
+    function pauseTimer() {
+      const t = focusTimer.value;
+      if (t && t.running) {
+        t.accumulated = (t.accumulated || 0) + Math.floor((Date.now() - t.startedAt) / 1000);
+        t.running   = false;
+        t.startedAt = null;
+      }
+      focusTimer.value = null;
+      view.value = 'list';
+      stopTick();
+    }
+
+    function deleteTimer(id) {
+      const t = timers.value.find(x => x.id === id);
+      if (t && t.running) { t.running = false; stopTick(); }
+      timers.value = timers.value.filter(x => x.id !== id);
+    }
+
+    /* ── Focus clock computed ── */
+    const focusElapsed = computed(() => focusTimer.value ? getElapsed(focusTimer.value) : 0);
+    const focusHH = computed(() => String(Math.floor(focusElapsed.value / 3600)).padStart(2,'0'));
+    const focusMM = computed(() => String(Math.floor((focusElapsed.value % 3600) / 60)).padStart(2,'0'));
+    const focusSS = computed(() => String(focusElapsed.value % 60).padStart(2,'0'));
+
+    /* ── Theme ── */
+    function toggleTheme() {
+      theme.value = theme.value === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(THEME_KEY, theme.value);
+      document.querySelector('#theme-meta').content = theme.value === 'light' ? '#f5f4f0' : '#111110';
+    }
+
+    /* ── Swipe to delete ── */
+    const swipeState = {};
+    const SWIPE_THRESHOLD = 80;
+
+    function onTouchStart(e, t) {
+      const touch = e.touches[0];
+      swipeState[t.id] = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        dx: 0,
+        locked: false,
+      };
+    }
+
+    function onTouchMove(e, t) {
+      const s = swipeState[t.id];
+      if (!s) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - s.startX;
+      const dy = touch.clientY - s.startY;
+
+      // lock direction on first significant move
+      if (!s.locked) {
+        if (Math.abs(dy) > Math.abs(dx)) { s.locked = 'y'; return; }
+        if (Math.abs(dx) > 6) s.locked = 'x';
+        else return;
+      }
+      if (s.locked === 'y') return;
+
+      e.preventDefault();
+      s.dx = Math.min(0, dx); // only left swipe
+      const card = e.currentTarget;
+      const translate = Math.max(-SWIPE_THRESHOLD - 20, s.dx);
+      card.style.transform = `translateX(${translate}px)`;
+    }
+
+    function onTouchEnd(e, t) {
+      const s = swipeState[t.id];
+      if (!s || s.locked !== 'x') return;
+      const card = e.currentTarget;
+
+      if (s.dx <= -SWIPE_THRESHOLD) {
+        // animate out then delete
+        card.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+        card.style.transform  = 'translateX(-110%)';
+        card.style.opacity    = '0';
+        setTimeout(() => deleteTimer(t.id), 220);
+      } else {
+        card.style.transition = 'transform 0.25s cubic-bezier(.34,1.56,.64,1)';
+        card.style.transform  = 'translateX(0)';
+        setTimeout(() => { card.style.transition = ''; }, 300);
+      }
+      delete swipeState[t.id];
+    }
+
+    /* ── Install prompt ── */
+    let installPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      installPrompt = e;
+    });
+
+    onMounted(() => {
+      load();
+      // Apply theme to document root
+      watch(theme, val => {
+        document.getElementById('app-inner')?.classList.toggle('light', val === 'light');
+      }, { immediate: true });
+    });
+
+    onUnmounted(() => stopTick());
+
+    return {
+      view, newName, timers, focusTimer, theme,
+      focusHH, focusMM, focusSS,
+      addTimer, startFocus, pauseTimer,
+      getElapsed, formatTime,
+      onTouchStart, onTouchMove, onTouchEnd,
+      toggleTheme,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
