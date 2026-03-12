@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Timers</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111110" id="theme-meta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Timers" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── TOKENS: default = dark ─────────────────────────────── */
+    :root {
+      --bg:         #111110;
+      --bg2:        #1a1a18;
+      --bg3:        #242420;
+      --line:       #2e2e2a;
+      --muted:      #6b6b60;
+      --text:       #e8e8e0;
+      --text2:      #a0a090;
+      --accent:     #e8b84b;
+      --accent-bg:  rgba(232,184,75,.10);
+      --danger:     #e85a4b;
+      --danger-bg:  rgba(232,90,75,.10);
+      --running:    #5be88a;
+      --radius:     18px;
+      --radius-sm:  12px;
+      --bar-h:      62px;
+    }
+
+    /* ── LIGHT MODE — applied to <html> ─────────────────────── */
+    html.light {
+      --bg:         #f5f4f0;
+      --bg2:        #eceae3;
+      --bg3:        #e0ddd4;
+      --line:       #d0cdc4;
+      --muted:      #9c9888;
+      --text:       #1a1a16;
+      --text2:      #6b6860;
+      --accent:     #c4920a;
+      --accent-bg:  rgba(196,146,10,.10);
+      --danger:     #cc3a2c;
+      --danger-bg:  rgba(204,58,44,.10);
+      --running:    #1a9946;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    /* Background on BOTH html and body — covers overscroll bounce areas on iOS */
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-weight: 400;
+      overscroll-behavior: none;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    #app {
+      max-width: 430px;
+      margin: 0 auto;
+      height: 100dvh;
+      position: relative;
+    }
+
+    /* ── SCROLLABLE CONTENT AREA ────────────────────────────── */
+    .view {
+      position: absolute;
+      inset: 0;
+      /* bottom clears fixed app bar + safe area */
+      bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: env(safe-area-inset-top, 20px) 20px 20px;
+    }
+
+    /* ── FIXED APP BAR ──────────────────────────────────────── */
+    .app-bar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      /* height includes safe area so content sits above home indicator */
+      height: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 24px;
+      padding-right: 24px;
+      z-index: 100;
+      transition: background 0.25s, border-color 0.25s;
+    }
+
+    /* ── LIST HEADER ────────────────────────────────────────── */
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 24px 0 26px;
+    }
+
+    .list-title {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .list-title span { color: var(--accent); }
+
+    .count-pill {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    /* ── ADD FORM ───────────────────────────────────────────── */
+    .add-form { display: flex; gap: 10px; margin-bottom: 26px; }
+
+    .add-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      color: var(--text);
+      outline: none;
+      -webkit-appearance: none;
+      transition: border-color 0.18s, background 0.25s, color 0.25s;
+    }
+    .add-input::placeholder { color: var(--muted); }
+    .add-input:focus { border-color: var(--accent); }
+
+    .btn-save {
+      background: var(--accent);
+      color: #111110;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0 22px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-save:disabled { opacity: 0.3; cursor: default; }
+    .btn-save:not(:disabled):active { transform: scale(0.94); opacity: 0.85; }
+
+    /* ── TIMER LIST ─────────────────────────────────────────── */
+    .timers-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .empty-state { text-align: center; padding: 64px 0 40px; color: var(--muted); }
+    .empty-icon  { font-size: 2.4rem; margin-bottom: 14px; opacity: 0.45; }
+    .empty-msg   { font-size: 0.9rem; line-height: 1.7; }
+
+    .timer-row {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+    }
+
+    .delete-bg {
+      position: absolute; inset: 0;
+      background: var(--danger-bg);
+      border: 1.5px solid var(--danger);
+      border-radius: var(--radius);
+      display: flex; align-items: center;
+      justify-content: flex-end;
+      padding-right: 22px;
+    }
+    .delete-bg-label { font-size: 0.82rem; font-weight: 500; color: var(--danger); letter-spacing: 0.04em; }
+
+    .timer-card {
+      position: relative;
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 16px 16px 18px;
+      display: flex; align-items: center; gap: 12px;
+      user-select: none;
+      touch-action: pan-y;
+      will-change: transform;
+      transition: border-color 0.18s, background 0.25s;
+    }
+    .timer-card.running { border-color: var(--running); }
+
+    .timer-info { flex: 1; min-width: 0; }
+
+    .timer-name {
+      font-size: 1rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .timer-elapsed {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem; font-weight: 300;
+      color: var(--muted); letter-spacing: 0.04em;
+    }
+    .timer-card.running .timer-elapsed { color: var(--running); }
+
+    .running-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--running); flex-shrink: 0;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.35; transform:scale(0.65); }
+    }
+
+    .btn-start {
+      background: var(--accent-bg);
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius-sm);
+      width: 42px; height: 42px; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-start:active { transform: scale(0.86); background: var(--accent); color: #111110; }
+
+    /* ── FOCUS VIEW ─────────────────────────────────────────── */
+    .focus-view {
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      text-align: center; height: 100%; padding: 0 28px;
+    }
+
+    .focus-label {
+      font-size: 0.72rem; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 18px;
+    }
+
+    .focus-name {
+      font-size: 1.6rem; font-weight: 600;
+      letter-spacing: -0.02em; line-height: 1.2;
+      max-width: 300px; margin-bottom: 52px;
+    }
+
+    .focus-clock {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(3.8rem, 17vw, 5.4rem);
+      font-weight: 300; letter-spacing: -0.01em;
+      color: var(--accent); line-height: 1; margin-bottom: 64px;
+    }
+    .focus-clock .colon { animation: blink 1s step-start infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+
+    .btn-pause {
+      background: var(--bg2);
+      border: 1.5px solid var(--line);
+      color: var(--text2);
+      border-radius: 100px;
+      padding: 16px 44px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem; font-weight: 500;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+      transition: border-color 0.15s, transform 0.1s, background 0.25s;
+    }
+    .btn-pause:active { transform: scale(0.95); border-color: var(--muted); }
+
+    .pause-icon { display: flex; gap: 4px; align-items: center; }
+    .pause-bar  { width: 4px; height: 16px; background: var(--text2); border-radius: 2px; }
+
+    /* ── APP BAR CONTENTS ───────────────────────────────────── */
+    .bar-brand { display: flex; align-items: center; gap: 9px; }
+    .bar-icon  { width: 26px; height: 26px; }
+    .bar-name  {
+      font-size: 0.8rem; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    }
+
+    .bar-back {
+      background: none; border: none; color: var(--text2);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem; font-weight: 400;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .bar-back:active { opacity: 0.6; }
+
+    .theme-toggle {
+      background: var(--bg3); border: 1.5px solid var(--line);
+      border-radius: 100px; width: 54px; height: 30px;
+      cursor: pointer; position: relative; flex-shrink: 0;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .toggle-knob {
+      position: absolute; top: 3px; left: 3px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--muted);
+      display: flex; align-items: center; justify-content: center; font-size: 0.7rem;
+      transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), background 0.25s;
+    }
+    html.light .toggle-knob { transform: translateX(24px); background: var(--accent); }
+
+    /* ── ANIMATIONS ─────────────────────────────────────────── */
+    .fade-in { animation: fadeIn 0.22s ease both; }
+    @keyframes fadeIn {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+/* ── Service Worker ───────────────────────────────────────── */
+if ('serviceWorker' in navigator) {
+  const sw = `
+    const CACHE = 'timers-v2';
+    const FILES = ['./', './index.html', './manifest.json', './icon.svg'];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES).catch(()=>{})));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(ks =>
+        Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      ));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+  `;
+  const blob = new Blob([sw], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob), { scope: './' }).catch(() => {});
+}
+
+/* ── Vue App ──────────────────────────────────────────────── */
+const { createApp, ref, computed, watch, onMounted, onUnmounted } = Vue;
+
+createApp({
+  template: `
+  <div id="app-root">
+    <div class="view">
+
+      <!-- ══ LIST ══ -->
+      <template v-if="view === 'list'">
+        <div class="fade-in">
+          <div class="list-header">
+            <h1 class="list-title">Tim<span>ers</span></h1>
+            <span class="count-pill">{{ timers.length }} total</span>
+          </div>
+
+          <div class="add-form">
+            <input
+              class="add-input"
+              v-model="newName"
+              @keyup.enter="addTimer"
+              placeholder="Timer name…"
+              maxlength="32"
+              autocomplete="off"
+              autocorrect="off"
+              spellcheck="false"
+            />
+            <button class="btn-save" @click="addTimer" :disabled="!newName.trim()">Save</button>
+          </div>
+
+          <div class="timers-list">
+            <div v-if="timers.length === 0" class="empty-state">
+              <div class="empty-icon">⏱</div>
+              <p class="empty-msg">No timers yet.<br/>Enter a name above to get started.</p>
+            </div>
+
+            <div v-for="t in timers" :key="t.id" class="timer-row">
+              <div class="delete-bg">
+                <span class="delete-bg-label">Delete</span>
+              </div>
+              <div
+                class="timer-card"
+                :class="{ running: t.running }"
+                @touchstart="onTouchStart($event, t)"
+                @touchmove="onTouchMove($event, t)"
+                @touchend="onTouchEnd($event, t)"
+              >
+                <div v-if="t.running" class="running-dot"></div>
+                <div class="timer-info">
+                  <div class="timer-name">{{ t.name }}</div>
+                  <div class="timer-elapsed">{{ formatTime(getElapsed(t)) }}</div>
+                </div>
+                <button class="btn-start" @click.stop="startFocus(t)">▶</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ══ FOCUS ══ -->
+      <template v-if="view === 'focus' && focusTimer">
+        <div class="focus-view fade-in">
+          <div class="focus-label">Running</div>
+          <div class="focus-name">{{ focusTimer.name }}</div>
+          <div class="focus-clock">
+            {{ focusHH }}<span class="colon">:</span>{{ focusMM }}<span class="colon">:</span>{{ focusSS }}
+          </div>
+          <button class="btn-pause" @click="pauseTimer">
+            <span class="pause-icon"><span class="pause-bar"></span><span class="pause-bar"></span></span>
+            Pause
+          </button>
+        </div>
+      </template>
+
+    </div>
+
+    <!-- ══ FIXED APP BAR ══ -->
+    <div class="app-bar">
+      <div v-if="view === 'list'" class="bar-brand">
+        <svg class="bar-icon" viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="15" r="9" stroke="var(--accent)" stroke-width="2"/>
+          <line x1="14" y1="15" x2="14" y2="9"  stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="14" y1="15" x2="19" y2="15" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="11" y1="4"  x2="17" y2="4"  stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <line x1="14" y1="4"  x2="14" y2="6"  stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="bar-name">Timers</span>
+      </div>
+      <button v-if="view === 'focus'" class="bar-back" @click="pauseTimer">← List</button>
+
+      <div class="theme-toggle" @click="toggleTheme">
+        <div class="toggle-knob">{{ isLight ? '☀️' : '🌙' }}</div>
+      </div>
+    </div>
+  </div>
+  `,
+
+  setup() {
+    const STORAGE_KEY = 'timers-data-v1';
+    const THEME_KEY   = 'timers-theme-v1';
+
+    const view       = ref('list');
+    const newName    = ref('');
+    const timers     = ref([]);
+    const focusTimer = ref(null);
+    const isLight    = ref(false);
+    const tick       = ref(0);
+    let   tickId     = null;
+
+    /* ── Theme ── */
+    function applyTheme(light) {
+      isLight.value = light;
+      document.documentElement.classList.toggle('light', light);
+      document.getElementById('theme-meta').content = light ? '#f5f4f0' : '#111110';
+    }
+    function toggleTheme() {
+      const next = !isLight.value;
+      applyTheme(next);
+      localStorage.setItem(THEME_KEY, next ? 'light' : 'dark');
+    }
+
+    /* ── Storage ── */
+    function load() {
+      try {
+        timers.value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+          .map(t => ({ ...t, running: false }));
+      } catch { timers.value = []; }
+    }
+    watch(timers, v => localStorage.setItem(STORAGE_KEY, JSON.stringify(v)), { deep: true });
+
+    /* ── Tick ── */
+    function startTick() { if (!tickId) tickId = setInterval(() => tick.value++, 1000); }
+    function stopTick()  { clearInterval(tickId); tickId = null; }
+
+    /* ── Helpers ── */
+    const pad = n => String(n).padStart(2, '0');
+
+    function getElapsed(t) {
+      void tick.value;
+      return (t.accumulated || 0) + (t.running ? Math.floor((Date.now() - t.startedAt) / 1000) : 0);
+    }
+
+    function formatTime(s) {
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+    }
+
+    /* ── Actions ── */
+    function addTimer() {
+      const name = newName.value.trim();
+      if (!name) return;
+      timers.value.unshift({ id: Date.now(), name, accumulated: 0, running: false, startedAt: null });
+      newName.value = '';
+    }
+
+    function startFocus(t) {
+      timers.value.forEach(x => {
+        if (x.running && x.id !== t.id) {
+          x.accumulated = getElapsed(x);
+          x.running = false; x.startedAt = null;
+        }
+      });
+      t.running = true; t.startedAt = Date.now();
+      focusTimer.value = t;
+      view.value = 'focus';
+      startTick();
+    }
+
+    function pauseTimer() {
+      const t = focusTimer.value;
+      if (t?.running) { t.accumulated = getElapsed(t); t.running = false; t.startedAt = null; }
+      focusTimer.value = null;
+      view.value = 'list';
+      stopTick();
+    }
+
+    function deleteTimer(id) {
+      if (focusTimer.value?.id === id) { focusTimer.value = null; view.value = 'list'; stopTick(); }
+      timers.value = timers.value.filter(x => x.id !== id);
+    }
+
+    /* ── Focus clock ── */
+    const focusElapsed = computed(() => focusTimer.value ? getElapsed(focusTimer.value) : 0);
+    const focusHH = computed(() => pad(Math.floor(focusElapsed.value / 3600)));
+    const focusMM = computed(() => pad(Math.floor((focusElapsed.value % 3600) / 60)));
+    const focusSS = computed(() => pad(focusElapsed.value % 60));
+
+    /* ── Swipe to delete ── */
+    const swipe = {};
+    const THRESHOLD = 80;
+
+    function onTouchStart(e, t) {
+      const { clientX: x, clientY: y } = e.touches[0];
+      swipe[t.id] = { x, y, dx: 0, axis: null };
+    }
+    function onTouchMove(e, t) {
+      const s = swipe[t.id]; if (!s) return;
+      const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+      if (!s.axis) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        s.axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+      }
+      if (s.axis === 'y') return;
+      e.preventDefault();
+      s.dx = Math.min(0, dx);
+      e.currentTarget.style.transform = `translateX(${Math.max(-THRESHOLD - 24, s.dx)}px)`;
+    }
+    function onTouchEnd(e, t) {
+      const s = swipe[t.id]; if (!s || s.axis !== 'x') return;
+      const card = e.currentTarget;
+      if (s.dx <= -THRESHOLD) {
+        card.style.transition = 'transform .2s ease, opacity .2s ease';
+        card.style.transform = 'translateX(-110%)';
+        card.style.opacity = '0';
+        setTimeout(() => deleteTimer(t.id), 210);
+      } else {
+        card.style.transition = 'transform .25s cubic-bezier(.34,1.56,.64,1)';
+        card.style.transform = 'translateX(0)';
+        setTimeout(() => card.style.transition = '', 300);
+      }
+      delete swipe[t.id];
+    }
+
+    onMounted(() => {
+      applyTheme(localStorage.getItem(THEME_KEY) === 'light');
+      load();
+    });
+    onUnmounted(stopTick);
+
+    return {
+      view, newName, timers, focusTimer, isLight,
+      focusHH, focusMM, focusSS,
+      addTimer, startFocus, pauseTimer,
+      getElapsed, formatTime,
+      onTouchStart, onTouchMove, onTouchEnd,
+      toggleTheme,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
